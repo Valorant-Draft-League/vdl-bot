@@ -4,17 +4,23 @@ use serenity::builder::{CreateEmbed, CreateInteractionResponseMessage};
 use supabase_rs::SupabaseClient;
 use dotenv::dotenv;
 use std::env::var;
+use shuttle_runtime::SecretStore;
 
-pub async fn run<'a>(options: &'a [ResolvedOption<'a>]) -> CreateInteractionResponseMessage {
+pub async fn run<'a>(
+    options: &'a [ResolvedOption<'a>],
+    secrets: &SecretStore,
+) -> CreateInteractionResponseMessage {
     dotenv().ok();
+
     if let Some(ResolvedOption {
         value: ResolvedValue::String(value), ..
     }) = options.first()
-    {   
+    {
         let supabase_client: SupabaseClient = SupabaseClient::new(
-            var("SUPABASE_URL").unwrap(),
-            var("SUPABASE_KEY").unwrap()
-            ).unwrap();
+            secrets.get("SUPABASE_URL").expect("SUPABASE_URL not found"),
+            secrets.get("SUPABASE_KEY").expect("SUPABASE_KEY not found"),
+        )
+        .unwrap();
 
         let image_url = format!("https://owgxafpmhpneozularvz.supabase.co/storage/v1/object/public/vdlcdn//{}.png", value.replace(" ", "_").to_lowercase());
         println!("{}", image_url);

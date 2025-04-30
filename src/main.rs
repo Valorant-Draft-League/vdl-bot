@@ -10,7 +10,6 @@ use serenity::{async_trait, Client};
 use shuttle_runtime::SecretStore;
 use std::{
     collections::{HashMap, HashSet},
-    env,
     sync::{Arc, Mutex},
 };
 use serenity::all::GatewayIntents;
@@ -21,6 +20,7 @@ struct Handler {
     target_voice_channel_id: ChannelId,
     created_vcs: Arc<Mutex<HashSet<ChannelId>>>,
     vc_occupants: Arc<Mutex<HashMap<ChannelId, HashSet<UserId>>>>,
+    secrets: SecretStore,
 }
 
 fn grab_vc_name() -> String {
@@ -40,8 +40,8 @@ impl EventHandler for Handler {
         if let Interaction::Command(cmd) = interaction {
             let content = match cmd.data.name.as_str() {
                 "profile"   => commands::profile::run(ctx.clone(), cmd.clone()).await,
-                "status"    => commands::status::run(&cmd.data.options()).await,
-                "franchise" => commands::franchise::run(&cmd.data.options()).await,
+                "status"    => commands::status::run(&cmd.data.options(), &self.secrets).await,
+                "franchise" => commands::franchise::run(&cmd.data.options(), &self.secrets).await,
                 _ => serenity::builder::CreateInteractionResponseMessage::new()
                         .content("Unknown command"),
             };
@@ -63,8 +63,9 @@ impl EventHandler for Handler {
         );
 
         let guild_id = GuildId::new(
-            env::var("GUILD_ID")
-                .expect("Expected GUILD_ID in environment")
+           self.secrets
+                .get("GUILD_ID")
+                .expect("GUILD_ID not found")
                 .parse()
                 .expect("GUILD_ID must be an integer"),
         );
@@ -140,8 +141,11 @@ impl EventHandler for Handler {
         {
             let name = grab_vc_name();
             let guild_id = GuildId::new(
-                env::var("GUILD_ID").expect("GUILD_ID not set")
-                    .parse().expect("GUILD_ID invalid"),
+                self.secrets
+                    .get("GUILD_ID")
+                    .expect("GUILD_ID not found")
+                    .parse()
+                    .expect("GUILD_ID must be an integer"),
             );
             let builder = CreateChannel::new(name.clone()).kind(ChannelType::Voice);
 
@@ -179,6 +183,7 @@ async fn serenity(
             target_voice_channel_id: ChannelId::new(1365567367752716303),
             created_vcs: Arc::new(Mutex::new(HashSet::new())),
             vc_occupants: Arc::new(Mutex::new(HashMap::new())),
+            secrets: secrets.clone(),
         })
         .await
         .expect("Error creating client");

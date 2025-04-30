@@ -6,6 +6,7 @@ use serenity::builder::{CreateEmbed, CreateInteractionResponseMessage};
 use supabase_rs::SupabaseClient;
 use dotenv::dotenv;
 use std::env::var;
+use shuttle_runtime::SecretStore;
 
 struct UserStatus {
     id: i32,
@@ -22,7 +23,10 @@ impl UserStatus {
     }
 }
 
-pub async fn run<'a>(options: &'a [ResolvedOption<'a>]) -> CreateInteractionResponseMessage {
+pub async fn run<'a>(
+    options: &'a [ResolvedOption<'a>],
+    secrets: &SecretStore,
+) -> CreateInteractionResponseMessage {
     dotenv().ok();
 
     if let Some(ResolvedOption {
@@ -30,9 +34,10 @@ pub async fn run<'a>(options: &'a [ResolvedOption<'a>]) -> CreateInteractionResp
     }) = options.first()
     {
         let supabase_client: SupabaseClient = SupabaseClient::new(
-            var("SUPABASE_URL").unwrap(),
-            var("SUPABASE_KEY").unwrap()
-            ).unwrap();
+            secrets.get("SUPABASE_URL").expect("SUPABASE_URL not found"),
+            secrets.get("SUPABASE_KEY").expect("SUPABASE_KEY not found"),
+        )
+        .unwrap();
         let data = supabase_client.select("users").columns(vec!["id", "discord_id", "username", "team_id", "created_at", "status"]).eq("discord_id", &user.id.get().to_string()).execute().await;
         println!("{:?}", data);
 
